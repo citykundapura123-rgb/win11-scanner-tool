@@ -15,10 +15,9 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Find and Publish App
+    - name: Find, Restore, and Publish App
       shell: pwsh
       run: |
-        # Automatically find the project file anywhere in the repository
         $csproj = Get-ChildItem -Recurse -Filter "Win11ScannerApp.csproj" | Select-Object -First 1
         if ($null -eq $csproj) {
             Write-Error "Could not find Win11ScannerApp.csproj!"
@@ -26,7 +25,10 @@ jobs:
         }
         Write-Host "Found project at: $($csproj.FullName)"
         
-        # Publish using the folder containing the project file
+        # Explicitly restore packages first
+        dotnet restore $csproj.FullName
+        
+        # Now publish the app
         dotnet publish $csproj.FullName -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o output
 
     - name: Upload Executable Artifact
