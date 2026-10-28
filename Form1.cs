@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 namespace Win11ScannerApp
 {
-    public partial class Form1 : Form
+    public class Form1 : Form
     {
         private Button btnScan;
         private Button btnCrop;
@@ -20,7 +20,7 @@ namespace Win11ScannerApp
 
         public Form1()
         {
-            InitializeComponent();
+            // InitializeComponent() removed because layout is handled below
             SetupLayout();
         }
 
@@ -79,10 +79,8 @@ namespace Win11ScannerApp
 
                 dynamic commonDialog = Activator.CreateInstance(wiaDlgType);
                 dynamic imageFile = commonDialog.ShowAcquireImage(
-                    1, // ScannerDeviceType
-                    0, // UnspecifiedIntent
-                    1, // MaximizeQuality
-                    "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}", // JPEG Format GUID
+                    1, 0, 1, 
+                    "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}", 
                     true, true, false
                 );
 
