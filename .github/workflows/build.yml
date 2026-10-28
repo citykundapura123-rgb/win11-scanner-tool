@@ -25,10 +25,7 @@ jobs:
         }
         Write-Host "Found project at: $($csproj.FullName)"
         
-        # Explicitly restore packages first
         dotnet restore $csproj.FullName
-        
-        # Now publish the app
         dotnet publish $csproj.FullName -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o output
 
     - name: Upload Executable Artifact
