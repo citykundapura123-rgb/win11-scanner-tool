@@ -1,10 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using PdfSharp.Pdf;
-using PdfSharp.Drawing;
 
 namespace Win11ScannerApp
 {
@@ -29,7 +26,7 @@ namespace Win11ScannerApp
 
         private void SetupLayout()
         {
-            this.Text = "Windows 11 64-bit Network & USB Scanner Software";
+            this.Text = "Windows 11 64-bit Network Scanner Tool";
             this.Width = 850;
             this.Height = 700;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -40,7 +37,7 @@ namespace Win11ScannerApp
             btnCrop = new Button { Text = "Crop Selection", Left = 160, Top = 20, Width = 130, Height = 35, Enabled = false };
             btnCrop.Click += BtnCrop_Click;
 
-            btnSave = new Button { Text = "Save (Image/PDF)", Left = 300, Top = 20, Width = 130, Height = 35, Enabled = false };
+            btnSave = new Button { Text = "Save Image", Left = 300, Top = 20, Width = 130, Height = 35, Enabled = false };
             btnSave.Click += BtnSave_Click;
 
             lblStatus = new Label { Text = "Status: Ready (Connect your scanner or LAN printer)", Left = 450, Top = 28, Width = 380 };
@@ -73,7 +70,6 @@ namespace Win11ScannerApp
             {
                 lblStatus.Text = "Status: Opening scanner selection dialog...";
 
-                // Use dynamic late-binding to prevent compile-time namespace dependency errors
                 Type wiaDlgType = Type.GetTypeFromProgID("WIA.CommonDialog");
                 if (wiaDlgType == null)
                 {
@@ -82,21 +78,17 @@ namespace Win11ScannerApp
                 }
 
                 dynamic commonDialog = Activator.CreateInstance(wiaDlgType);
-                
-                // Triggers Windows WIA device selection (works for USB & network Brother printers)
                 dynamic imageFile = commonDialog.ShowAcquireImage(
                     1, // ScannerDeviceType
                     0, // UnspecifiedIntent
                     1, // MaximizeQuality
                     "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}", // JPEG Format GUID
-                    true,
-                    true,
-                    false
+                    true, true, false
                 );
 
                 if (imageFile != null)
                 {
-                    lblStatus.Text = "Status: Processing scanned document over network/USB...";
+                    lblStatus.Text = "Status: Processing scanned document...";
 
                     string tempFileName = Path.Combine(Path.GetTempPath(), "scanned_document.jpg");
                     if (File.Exists(tempFileName)) File.Delete(tempFileName);
@@ -115,7 +107,7 @@ namespace Win11ScannerApp
 
                     btnCrop.Enabled = true;
                     btnSave.Enabled = true;
-                    lblStatus.Text = "Status: Scan successful! Click and drag on image to crop or save.";
+                    lblStatus.Text = "Status: Scan successful! Click and drag on image to crop.";
                 }
                 else
                 {
@@ -221,45 +213,14 @@ namespace Win11ScannerApp
 
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
-                sfd.Filter = "PDF Document|*.pdf|JPEG Image|*.jpg|PNG Image|*.png|Bitmap|*.bmp";
-                sfd.Title = "Save Scanned Document";
+                sfd.Filter = "JPEG Image|*.jpg|PNG Image|*.png|Bitmap|*.bmp";
+                sfd.Title = "Save Scanned Image";
                 sfd.FileName = "ScannedDocument_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
-                    string extension = Path.GetExtension(sfd.FileName).ToLower();
-
-                    if (extension == ".pdf")
-                    {
-                        string tempImgPath = Path.Combine(Path.GetTempPath(), "pdf_export_temp.jpg");
-                        pictureBox1.Image.Save(tempImgPath, System.Drawing.Imaging.ImageFormat.Jpeg);
-
-                        using (PdfDocument document = new PdfDocument())
-                        {
-                            PdfPage page = document.AddPage();
-                            if (pictureBox1.Image.Width > pictureBox1.Image.Height)
-                            {
-                                page.Orientation = PdfSharp.PageOrientation.Landscape;
-                            }
-
-                            using (XGraphics gfx = XGraphics.FromPdfPage(page))
-                            {
-                                using (XImage xImg = XImage.FromFile(tempImgPath))
-                                {
-                                    gfx.DrawImage(xImg, 0, 0, page.Width.Point, page.Height.Point);
-                                }
-                            }
-                            document.Save(sfd.FileName);
-                        }
-
-                        if (File.Exists(tempImgPath)) File.Delete(tempImgPath);
-                        lblStatus.Text = $"Status: Saved as PDF to {sfd.FileName}";
-                    }
-                    else
-                    {
-                        pictureBox1.Image.Save(sfd.FileName);
-                        lblStatus.Text = $"Status: Saved as image to {sfd.FileName}";
-                    }
+                    pictureBox1.Image.Save(sfd.FileName);
+                    lblStatus.Text = $"Status: Saved to {sfd.FileName}";
                 }
             }
         }
