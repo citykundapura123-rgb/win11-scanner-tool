@@ -15,11 +15,19 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore Win11ScannerApp.csproj
-
-    - name: Publish x64 App
-      run: dotnet publish Win11ScannerApp.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o output
+    - name: Find and Publish App
+      shell: pwsh
+      run: |
+        # Automatically find the project file anywhere in the repository
+        $csproj = Get-ChildItem -Recurse -Filter "Win11ScannerApp.csproj" | Select-Object -First 1
+        if ($null -eq $csproj) {
+            Write-Error "Could not find Win11ScannerApp.csproj!"
+            exit 1
+        }
+        Write-Host "Found project at: $($csproj.FullName)"
+        
+        # Publish using the folder containing the project file
+        dotnet publish $csproj.FullName -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o output
 
     - name: Upload Executable Artifact
       uses: actions/upload-artifact@v4
