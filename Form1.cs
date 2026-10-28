@@ -3,7 +3,6 @@ using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using WIA;
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 
@@ -17,7 +16,6 @@ namespace Win11ScannerApp
         private PictureBox pictureBox1;
         private Label lblStatus;
 
-        // Variables for interactive cropping selection
         private bool isSelecting = false;
         private Rectangle cropRectangle;
         private Point startPoint;
@@ -36,22 +34,17 @@ namespace Win11ScannerApp
             this.Height = 700;
             this.StartPosition = FormStartPosition.CenterScreen;
 
-            // Scan Button
             btnScan = new Button { Text = "Scan Document", Left = 20, Top = 20, Width = 130, Height = 35 };
             btnScan.Click += BtnScan_Click;
 
-            // Crop Button
             btnCrop = new Button { Text = "Crop Selection", Left = 160, Top = 20, Width = 130, Height = 35, Enabled = false };
             btnCrop.Click += BtnCrop_Click;
 
-            // Save Button
             btnSave = new Button { Text = "Save (Image/PDF)", Left = 300, Top = 20, Width = 130, Height = 35, Enabled = false };
             btnSave.Click += BtnSave_Click;
 
-            // Status Label
             lblStatus = new Label { Text = "Status: Ready (Connect your scanner or LAN printer)", Left = 450, Top = 28, Width = 380 };
 
-            // PictureBox Preview Area
             pictureBox1 = new PictureBox
             {
                 Left = 20,
@@ -62,7 +55,6 @@ namespace Win11ScannerApp
                 BorderStyle = BorderStyle.FixedSingle
             };
 
-            // Mouse events for drawing the crop selection box
             pictureBox1.MouseDown += PictureBox1_MouseDown;
             pictureBox1.MouseMove += PictureBox1_MouseMove;
             pictureBox1.MouseUp += PictureBox1_MouseUp;
@@ -81,18 +73,25 @@ namespace Win11ScannerApp
             {
                 lblStatus.Text = "Status: Opening scanner selection dialog...";
 
-                var commonDialog = new WIA.CommonDialog();
+                // Use dynamic late-binding to prevent compile-time namespace dependency errors
+                Type wiaDlgType = Type.GetTypeFromProgID("WIA.CommonDialog");
+                if (wiaDlgType == null)
+                {
+                    MessageBox.Show("WIA scanning components are not available on this system.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                dynamic commonDialog = Activator.CreateInstance(wiaDlgType);
                 
-                // Triggers Windows WIA device selection. Your network Brother LAN printer 
-                // will appear here automatically if installed on Windows 11.
-                WIA.ImageFile imageFile = commonDialog.ShowAcquireImage(
-                    WiaDeviceType.ScannerDeviceType,
-                    WiaImageIntent.UnspecifiedIntent,
-                    WiaImageBias.MaximizeQuality,
-                    FormatID: "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}", // Standard JPEG Format GUID
-                    AlwaysSelectDevice: true,
-                    UseCommonUI: true,
-                    CancelError: false
+                // Triggers Windows WIA device selection (works for USB & network Brother printers)
+                dynamic imageFile = commonDialog.ShowAcquireImage(
+                    1, // ScannerDeviceType
+                    0, // UnspecifiedIntent
+                    1, // MaximizeQuality
+                    "{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}", // JPEG Format GUID
+                    true,
+                    true,
+                    false
                 );
 
                 if (imageFile != null)
@@ -123,16 +122,11 @@ namespace Win11ScannerApp
                     lblStatus.Text = "Status: Scan cancelled by user.";
                 }
             }
-            catch (COMException ex)
-            {
-                MessageBox.Show($"Scanner Error: {ex.Message}\n\nEnsure your network printer is powered on, connected to your LAN, and the Windows scanner driver is installed.",
-                    "Hardware / Network Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                lblStatus.Text = "Status: Error during scanning process.";
-            }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error: {ex.Message}", "Application Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                lblStatus.Text = "Status: Failed.";
+                MessageBox.Show($"Scanner/Network Error: {ex.Message}\n\nEnsure your network printer is powered on and connected to your LAN.",
+                    "Hardware Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                lblStatus.Text = "Status: Error during scanning process.";
             }
         }
 
@@ -140,7 +134,6 @@ namespace Win11ScannerApp
         private void PictureBox1_MouseDown(object sender, MouseEventArgs e)
         {
             if (pictureBox1.Image == null) return;
-
             if (e.Button == MouseButtons.Left)
             {
                 isSelecting = true;
@@ -152,22 +145,17 @@ namespace Win11ScannerApp
         private void PictureBox1_MouseMove(object sender, MouseEventArgs e)
         {
             if (!isSelecting) return;
-
             int x = Math.Min(e.X, startPoint.X);
             int y = Math.Min(e.Y, startPoint.Y);
             int width = Math.Abs(e.X - startPoint.X);
             int height = Math.Abs(e.Y - startPoint.Y);
-
             cropRectangle = new Rectangle(x, y, width, height);
             pictureBox1.Refresh();
         }
 
         private void PictureBox1_MouseUp(object sender, MouseEventArgs e)
         {
-            if (isSelecting)
-            {
-                isSelecting = false;
-            }
+            if (isSelecting) isSelecting = false;
         }
 
         private void PictureBox1_Paint(object sender, PaintEventArgs e)
@@ -187,15 +175,13 @@ namespace Win11ScannerApp
         {
             if (originalBitmap == null || cropRectangle.Width <= 0 || cropRectangle.Height <= 0)
             {
-                MessageBox.Show("Please select a valid area on the image first by clicking and dragging.",
-                    "Crop Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please select a valid area on the image first by clicking and dragging.", "Crop Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             try
             {
                 Rectangle imgRect = GetImagePresentRect(pictureBox1);
-
                 float scaleX = (float)originalBitmap.Width / imgRect.Width;
                 float scaleY = (float)originalBitmap.Height / imgRect.Height;
 
@@ -251,7 +237,6 @@ namespace Win11ScannerApp
                         using (PdfDocument document = new PdfDocument())
                         {
                             PdfPage page = document.AddPage();
-                            
                             if (pictureBox1.Image.Width > pictureBox1.Image.Height)
                             {
                                 page.Orientation = PdfSharp.PageOrientation.Landscape;
@@ -282,11 +267,9 @@ namespace Win11ScannerApp
         private Rectangle GetImagePresentRect(PictureBox pb)
         {
             if (pb.Image == null) return Rectangle.Empty;
-
             Image img = pb.Image;
             float imgRatio = (float)img.Width / img.Height;
             float pbRatio = (float)pb.Width / pb.Height;
-
             int width = pb.Width;
             int height = pb.Height;
             int x = 0;
@@ -302,7 +285,6 @@ namespace Win11ScannerApp
                 width = (int)(pb.Height * imgRatio);
                 x = (pb.Width - width) / 2;
             }
-
             return new Rectangle(x, y, width, height);
         }
     }
